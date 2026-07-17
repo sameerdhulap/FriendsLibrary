@@ -1,0 +1,12 @@
+{
+  "name": "book-watcher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watches friendslibrary.in book availability and emails when a copy is free",
+  "scripts": {
+    "check": "node check-book.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.14"
+  }
+}
