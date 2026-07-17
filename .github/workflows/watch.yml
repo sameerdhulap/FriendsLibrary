@@ -2,8 +2,8 @@ name: Book availability watch
 
 on:
   schedule:
-    # Every 12 hours (UTC). 03:30 & 15:30 UTC = 9:00 AM & 9:00 PM IST
-    - cron: "30 3,15 * * *"
+    # Every 3 hours (UTC)
+    - cron: "0 */3 * * *"
   workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
 
 jobs:
