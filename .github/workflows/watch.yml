@@ -23,6 +23,6 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: samir.dhulap@gmail.com
-          BOOK_URL: https://friendslibrary.in/book/2569/rarang-dhang
+          BOOK_URL: ${{ vars.BOOK_URL }}
           # NOTIFY_ALWAYS: "true"   # uncomment to get an email every run, not just when available
         run: node check-book.js
