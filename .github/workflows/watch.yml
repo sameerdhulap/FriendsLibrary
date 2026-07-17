@@ -1,0 +1,28 @@
+name: Book availability watch
+
+on:
+  schedule:
+    # Every 12 hours (UTC). 03:30 & 15:30 UTC = 9:00 AM & 9:00 PM IST
+    - cron: "30 3,15 * * *"
+  workflow_dispatch: {} # lets you trigger a run manually from the Actions tab
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+
+      - name: Check book availability
+        env:
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_TO: samir.dhulap@gmail.com
+          BOOK_URL: https://friendslibrary.in/book/2569/rarang-dhang
+          # NOTIFY_ALWAYS: "true"   # uncomment to get an email every run, not just when available
+        run: node check-book.js
