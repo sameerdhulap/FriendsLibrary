@@ -103,7 +103,8 @@ function formatLine(status) {
       continue;
     }
     const line = formatLine(result.status);
-    console.log(new Date().toISOString(), "-", line);
+    const status = result.status.available > 0 ? "Available" : "Not available";
+    console.log(new Date().toISOString(), "-", `${line} (${status})`);
     if (result.status.available > 0) {
       available.push(result.status);
     } else {
