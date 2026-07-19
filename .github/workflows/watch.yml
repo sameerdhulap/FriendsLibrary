@@ -23,6 +23,9 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_TO: samir.dhulap@gmail.com
+          # One or more book URLs, separated by comma or newline. Falls back to
+          # BOOK_URL (single) and then the default book if unset.
+          BOOK_URLS: ${{ vars.BOOK_URLS }}
           BOOK_URL: ${{ vars.BOOK_URL }}
           # NOTIFY_ALWAYS: "true"   # uncomment to get an email every run, not just when available
         run: node check-book.js
