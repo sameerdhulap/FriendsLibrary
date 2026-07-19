@@ -1,26 +1,39 @@
 // check-book.js
-// Checks availability of a book on friendslibrary.in and emails the status.
-// Designed to run in GitHub Actions on a 12-hour cron, but works anywhere Node 18+ runs.
+// Checks availability of one or more books on friendslibrary.in and emails the status.
+// Designed to run in GitHub Actions on a cron, but works anywhere Node 18+ runs.
 //
 // Env vars required for email:
 //   SMTP_USER  - Gmail address used to send (e.g. yourname@gmail.com)
 //   SMTP_PASS  - Gmail App Password (NOT your normal password)
 //   MAIL_TO    - recipient (samir.dhulap@gmail.com)
 // Optional:
-//   BOOK_URL         - defaults to the Rarang Dhang page
+//   BOOK_URLS        - one or more book page URLs, separated by comma or newline.
+//                      Takes precedence over BOOK_URL.
+//   BOOK_URL         - single book URL (kept for backwards compatibility).
 //   NOTIFY_ALWAYS    - "true" to email every run; default only emails when copies > 0
 
 const nodemailer = require("nodemailer");
 
-const BOOK_URL =
-  process.env.BOOK_URL || "https://friendslibrary.in/book/2569/rarang-dhang";
+const DEFAULT_BOOK_URL = "https://friendslibrary.in/book/2569/rarang-dhang";
 const NOTIFY_ALWAYS = (process.env.NOTIFY_ALWAYS || "false") === "true";
 
-async function fetchStatus() {
-  const res = await fetch(BOOK_URL, {
+// Build the list of books to watch. BOOK_URLS (comma/newline separated) wins;
+// otherwise fall back to the single BOOK_URL, otherwise the default.
+function getBookUrls() {
+  const raw = process.env.BOOK_URLS || process.env.BOOK_URL || DEFAULT_BOOK_URL;
+  const urls = raw
+    .split(/[\n,]+/)
+    .map((u) => u.trim())
+    .filter(Boolean);
+  // De-duplicate while preserving order.
+  return [...new Set(urls)];
+}
+
+async function fetchStatus(bookUrl) {
+  const res = await fetch(bookUrl, {
     headers: { "User-Agent": "Mozilla/5.0 (book-availability-watcher)" },
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${BOOK_URL}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${bookUrl}`);
   const html = await res.text();
 
   // The page renders e.g.:
@@ -36,6 +49,7 @@ async function fetchStatus() {
   }
 
   return {
+    url: bookUrl,
     title: titleMatch ? titleMatch[1].trim() : "Unknown title",
     available: parseInt(availMatch[1], 10),
     total: totalMatch ? parseInt(totalMatch[1], 10) : null,
@@ -58,22 +72,70 @@ async function sendMail(subject, body) {
   });
 }
 
-(async () => {
-  const status = await fetchStatus();
-  const line = `${status.title}: ${status.available} of ${status.total ?? "?"} copies available`;
-  console.log(new Date().toISOString(), "-", line);
+function formatLine(status) {
+  return `${status.title}: ${status.available} of ${status.total ?? "?"} copies available`;
+}
 
-  if (status.available > 0) {
-    await sendMail(
-      `📗 AVAILABLE: ${status.title} (${status.available} cop${status.available > 1 ? "ies" : "y"})`,
-      `${line}\n\nGrab it: ${BOOK_URL}`
-    );
-    console.log("Availability email sent.");
+(async () => {
+  const bookUrls = getBookUrls();
+  console.log(`Checking ${bookUrls.length} book(s).`);
+
+  // Check every book, capturing per-book failures so one bad page doesn't
+  // stop the others from being checked.
+  const results = await Promise.all(
+    bookUrls.map(async (url) => {
+      try {
+        return { ok: true, status: await fetchStatus(url) };
+      } catch (err) {
+        return { ok: false, url, error: err.message };
+      }
+    })
+  );
+
+  const available = [];
+  const unavailable = [];
+  const failures = [];
+
+  for (const result of results) {
+    if (!result.ok) {
+      failures.push(result);
+      console.error(`Failed: ${result.url} — ${result.error}`);
+      continue;
+    }
+    const line = formatLine(result.status);
+    console.log(new Date().toISOString(), "-", line);
+    if (result.status.available > 0) {
+      available.push(result.status);
+    } else {
+      unavailable.push(result.status);
+    }
+  }
+
+  if (available.length > 0) {
+    const subject =
+      available.length === 1
+        ? `📗 AVAILABLE: ${available[0].title} (${available[0].available} cop${available[0].available > 1 ? "ies" : "y"})`
+        : `📗 ${available.length} watched books are available`;
+    const body = available
+      .map((s) => `${formatLine(s)}\nGrab it: ${s.url}`)
+      .join("\n\n");
+    await sendMail(subject, body);
+    console.log(`Availability email sent for ${available.length} book(s).`);
   } else if (NOTIFY_ALWAYS) {
-    await sendMail(`Book watch: ${status.title} still unavailable`, `${line}\n\n${BOOK_URL}`);
+    const body = unavailable.map((s) => `${formatLine(s)}\n${s.url}`).join("\n\n");
+    await sendMail(
+      `Book watch: none of ${unavailable.length} book(s) available`,
+      body || "No books checked successfully."
+    );
     console.log("Status email sent (NOTIFY_ALWAYS).");
   } else {
-    console.log("Not available — no email sent (set NOTIFY_ALWAYS=true to always email).");
+    console.log("Nothing available — no email sent (set NOTIFY_ALWAYS=true to always email).");
+  }
+
+  // Surface a non-zero exit only if every book failed to fetch, so a single
+  // broken page doesn't mask otherwise-successful checks.
+  if (failures.length === bookUrls.length) {
+    throw new Error("All book checks failed.");
   }
 })().catch((err) => {
   console.error("Watcher failed:", err.message);

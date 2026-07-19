@@ -1,7 +1,20 @@
 # Book Availability Watcher
 
-Checks https://friendslibrary.in/book/2569/rarang-dhang every 12 hours and emails
+Checks one or more books on friendslibrary.in on a schedule and emails
 samir.dhulap@gmail.com when a copy becomes available.
+
+## Watching multiple books
+
+Set the `BOOK_URLS` repo variable (Settings → Secrets and variables → Actions →
+Variables) to a comma- or newline-separated list of book page URLs, e.g.:
+
+```
+https://friendslibrary.in/book/2569/rarang-dhang, https://friendslibrary.in/book/1234/another-book
+```
+
+Every book is checked each run. You get a single email listing whichever books
+are available. A single broken/renamed page is logged but won't stop the others.
+The older single-book `BOOK_URL` variable still works as a fallback.
 
 The site has no public API, but availability ("Available Copies") is rendered
 server-side in the page HTML, so the script just fetches and parses it.
