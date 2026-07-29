@@ -22,7 +22,7 @@ jobs:
         env:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
-          MAIL_TO: samir.dhulap@gmail.com
+          MAIL_TO: kimaya.dhulap+github@gmail.com
           # One or more book URLs, separated by comma or newline. Falls back to
           # BOOK_URL (single) and then the default book if unset.
           BOOK_URLS: ${{ vars.BOOK_URLS }}
