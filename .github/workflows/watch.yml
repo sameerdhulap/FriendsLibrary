@@ -27,5 +27,5 @@ jobs:
           # BOOK_URL (single) and then the default book if unset.
           BOOK_URLS: ${{ vars.BOOK_URLS }}
           BOOK_URL: ${{ vars.BOOK_URL }}
-          # NOTIFY_ALWAYS: "true"   # uncomment to get an email every run, not just when available
+          NOTIFY_ALWAYS: ${{ vars.NOTIFY }} # uncomment to get an email every run, not just when available
         run: node check-book.js
