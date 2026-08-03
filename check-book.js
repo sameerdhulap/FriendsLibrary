@@ -56,7 +56,7 @@ async function fetchStatus(bookUrl) {
   };
 }
 
-async function sendMail(subject, body) {
+async function sendMail(subject, text, html) {
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
@@ -68,12 +68,35 @@ async function sendMail(subject, body) {
     from: `"Book Watcher" <${process.env.SMTP_USER}>`,
     to: process.env.MAIL_TO,
     subject,
-    text: body,
+    text,
+    // Only attach an HTML part when one is provided (availability emails).
+    ...(html ? { html } : {}),
   });
 }
 
 function formatLine(status) {
   return `${status.title}: ${status.available} of ${status.total ?? "?"} copies available`;
+}
+
+// Escape values (e.g. the scraped book title) before embedding in HTML email.
+function escapeHtml(value) {
+  return String(value).replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+  );
+}
+
+// One book's HTML block: a line of status plus a tap-friendly "Reserve now" button.
+function reserveBlock(status) {
+  const title = escapeHtml(status.title);
+  return (
+    `<p style="margin:0 0 6px">📗 <strong>${title}</strong> — ` +
+    `${status.available} of ${status.total ?? "?"} copies available</p>` +
+    `<p style="margin:0 0 22px">` +
+    `<a href="${encodeURI(status.url)}" ` +
+    `style="display:inline-block;padding:10px 18px;background:#1a7f37;color:#fff;` +
+    `text-decoration:none;border-radius:6px;font-weight:600">Reserve now &rarr;</a></p>`
+  );
 }
 
 (async () => {
@@ -118,9 +141,15 @@ function formatLine(status) {
         ? `📗 AVAILABLE: ${available[0].title} (${available[0].available} cop${available[0].available > 1 ? "ies" : "y"})`
         : `📗 ${available.length} watched books are available`;
     const body = available
-      .map((s) => `${formatLine(s)}\nGrab it: ${s.url}`)
+      .map((s) => `${formatLine(s)}\nReserve now: ${s.url}`)
       .join("\n\n");
-    await sendMail(subject, body);
+    const html =
+      `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;` +
+      `font-size:15px;color:#111">` +
+      available.map(reserveBlock).join("") +
+      `<p style="color:#666;font-size:12px;margin:0">` +
+      `Tapping "Reserve now" opens the book page — log in and confirm the hold there.</p></div>`;
+    await sendMail(subject, body, html);
     console.log(`Availability email sent for ${available.length} book(s).`);
   } else if (NOTIFY_ALWAYS) {
     const body = unavailable.map((s) => `${formatLine(s)}\n${s.url}`).join("\n\n");
