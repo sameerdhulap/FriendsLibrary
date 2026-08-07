@@ -27,5 +27,19 @@ jobs:
           # BOOK_URL (single) and then the default book if unset.
           BOOK_URLS: ${{ vars.BOOK_URLS }}
           BOOK_URL: ${{ vars.BOOK_URL }}
-          NOTIFY_ALWAYS: ${{ vars.NOTIFY }} # uncomment to get an email every run, not just when available
-        run: node check-book.js
+          NOTIFY_ALWAYS: ${{ vars.NOTIFY }} # set the NOTIFY repo variable to "true" to email every run
+        run: |
+          # Run the watcher, capture its output, and surface it on the run's
+          # summary page (Job Summary) while preserving the real exit code.
+          set +e
+          out=$(node check-book.js 2>&1)
+          code=$?
+          set -e
+          {
+            echo '### 📚 Book availability'
+            echo '```'
+            echo "$out"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$out"
+          exit $code
